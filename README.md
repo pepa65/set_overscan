@@ -13,7 +13,9 @@ Usage: `overscan [<top> <bottom> <left> <right>]`
 If the arguments are unsigned integers, they will set the overscan of
 the corresponding edge, if not, that edge will not be changed.
 This example modifies top and right, and leaves bottom and left unchanged:
-    overscan 16 - - 24
+
+`overscan 16 - - 24`
+
 Without arguments, the current values are displayed on stdout.
 
 ## setoverscan
