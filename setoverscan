@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+
+# setoverscan v0.12a - Modify overscan on the fly
+# By Russell "ukscone" Davis
+#  using code from Broadcom, Dom Cobley & Alex Bradbury
+#  2013-03-10, 2014-07-23, 2015-05-01, 2017-08-01, 2020-09-27 (pepa65)
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions, and the following disclaimer,
+#    without modification.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. The names of the above-listed copyright holders may not be used
+#    to endorse or promote products derived from this software without
+#    specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+# IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Required: coreutils(od dd head cat stty) grep sed ncurses-bin(tput clear)
+#           libraspberrypi-bin(vcgencmd) fbset whiptail overscan
+
+conf=/boot/config.txt
+
+# Root/sudo required
+((EUID)) &&
+	echo "Elevated privileges required, run as root or with sudo" >&2 && exit 1
+
+# Modify $conf with key=value
+Mod_conf(){ # $1:key $2:value  I:conf
+	sed -i "s@^ *$1=.*@#\0@" "$conf" # Comment-out all existing active lines
+	sed -i "0,/^# *$1=/a$1=$2" "$conf" # Insert new key=value after (first) old
+}
+
+# Enable overscan and reboot if not enabled yet
+vcgencmd get_config disable_overscan |grep '1$' &&
+	Mod_conf disable_overscan 0 &&
+	whiptail --msgbox "Enabled Overscan in $conf, please reboot first" 10 45 &&
+	exit 2
+
+Kc(){
+	local kc=$(od -t o1 |head -1)
+	echo "${kc#* }"
+}
+
+# Grab terminal capabilities
+tty_cuu1=$(tput cuu1 |Kc) # Up arrow
+tty_kcuu1=$(tput kcuu1 |Kc)
+tty_cud1=$(tput cud1 |Kc) # Down arrow
+tty_kcud1=$(tput kcud1 |Kc)
+tty_cub1=$(tput cub1 |Kc) # Left arrow
+tty_kcub1=$(tput kcub1 |Kc)
+tty_cuf1=$(tput cuf1 |Kc) # Right arrow
+tty_kcuf1=$(tput kcuf1 |Kc)
+# Some terminals (e.g. PuTTY) send the wrong code for certain arrow keys
+tty_cudx='033 133 102' tty_cubx='033 133 104' tty_cufx='033 133 103'
+
+# Check for mailbox & if not existing create it.
+created_mailbox=0
+[[ ! -c /dev/vcio ]] && created_mailbox=1 && mknod /dev/vcio c 100 0
+
+# Get current overscan values from GPU
+! overscan=$(type -p overscan) &&
+	echo -e "Install overscan first by:\n  make; sudo make install" && exit 3
+read top bottom left right < <(overscan)
+
+# How big is the screen?
+t=$(stty size) ty=${t% *} tx=${t#* }
+((xmid=tx/2, ymid=ty/2))
+
+# Create framebuffer-sized random and zeroed files
+mode=$(fbset |grep -o '[0-9]*x[0-9]*') random=$(mktemp) zeroes=$(mktemp)
+((bytes=${mode//x/*})
+dd if=/dev/urandom of="$random" bs=$bytes count=1
+dd if=/dev/zero of="$zeroes" bs=$bytes count=1
+
+# Save tty settings to restore
+tty_old=$(stty -g)
+trap 'stty $tty_old; tput cnorm ; exit' INT HUP TERM
+stty cs8 -icanon -echo min 3 time 1
+stty intr '' susp ''
+
+# Modify top-left or bottom-right overscan
+Overscan(){ # $1:'top-left'/'bottom-right'  I:xmid,ymid,top,bottom,left,right
+	local -n tb=${1%-*} lr=${1#*-}
+	whiptail --title "Overscan adjustment instructions" --msgbox "Random data will be dumped to the screen. Use the arrow keys to increase or decrease the ${1^^} corner's overscan. Press the q key when finished." 12 50
+	clear
+	tput civis # Cursor off
+	cat "$random" >/dev/fb0 # Random data into the framebuffer
+
+	while :
+	do
+		txt=" TOP=$top, LEFT=$left, BOTTOM=$bottom, RIGHT=$right  "
+		len=$((${#txt}/2))
+		((x=xmid-len))
+		echo -ne "\033[$ymid;${x}f$txt"
+		keypress=$(dd bs=3 count=1 2>/dev/null |Kc)
+		case "$keypress" in
+		"$tty_cuu1"|"$tty_kcuu1") ((tb--)) ;;
+		"$tty_cud1"|"$tty_kcud1"|"$tty_cudx") ((tb++)) ;;
+		"$tty_cub1"|"$tty_kcub1"|"$tty_cubx") ((lr--)) ;;
+		"$tty_cuf1"|"$tty_kcuf1"|"$tty_cufx") ((lr++)) ;;
+		"161") break ;;
+		esac
+		overscan $top $bottom $left $right
+	done
+	cat "$zeroes" >/dev/fb0
+	clear
+}
+
+Overscan top-left
+Overscan bottom-right
+
+# Finished so update $conf
+Mod_conf disable_overscan 1
+Mod_conf overscan_top $top
+Mod_conf overscan_bottom $bottom
+Mod_conf overscan_left $left
+Mod_conf overscan_right $right
+
+# Clean up
+((created_mailbox)) && rm -f /dev/vcio
+rm "$random" "$zeroes"
+
+# Restore tty
+stty $tty_old
+clear
+tput cnorm
