@@ -8,13 +8,13 @@
 ## overscan
 **Get/set Raspberry Pi overscan values directly**
 
-+ Required: build-essential sudo[installing]
 * Usage: `overscan [<top> <bottom> <left> <right>]`
 If an argument is an unsigned integer, the overscan of the corresponding
 edge gets set. If not, the overscan for that edge will not be changed.
 Without arguments, current overscan values are displayed.
 This example modifies top and right, and leaves bottom and left unchanged:
- - `overscan 16 - - 24`
+    * `overscan 16 - - 24`
++ Required: build-essential sudo[installing]
 
 ## setoverscan
 **Adjust Raspberry Pi overscan interactively**

@@ -38,19 +38,22 @@ conf=/boot/config.txt
 
 # Root/sudo required
 ((EUID)) &&
-	echo "Elevated privileges required, run as root or with sudo" >&2 && exit 1
+	msg="Elevated privileges needed, run as root or with 'sudo $0'." &&
+	whiptail --msgbox "$msg" 10 45 && exit 1
 
 # Modify $conf with key=value
 Mod_conf(){ # $1:key $2:value  I:conf
-	sed -i "s@^ *$1=.*@#\0@" "$conf" # Comment-out all existing active lines
-	sed -i "0,/^# *$1=/a$1=$2" "$conf" # Insert new key=value after (first) old
+	# Comment-out all existing active lines
+	sed -i "s@^ *($1=.*)@#\1@" "$conf"
+	# Replace the first old one with new key=value
+	sed -i "0,/^#$1=.*/s//$1=$2" "$conf"
 }
 
 # Enable overscan and reboot if not enabled yet
 vcgencmd get_config disable_overscan |grep '1$' &&
 	Mod_conf disable_overscan 0 &&
-	whiptail --msgbox "Enabled Overscan in $conf, please reboot first" 10 45 &&
-	exit 2
+	msg="Manual overscan enabled in $conf, please reboot first to continue." &&
+	whiptail --infobox "$msg" 10 45 && exit 2
 
 Kc(){
 	local kc=$(od -t o1 |head -1)
@@ -75,7 +78,8 @@ created_mailbox=0
 
 # Get current overscan values from GPU
 ! overscan=$(type -p overscan) &&
-	echo -e "Install overscan first by:\n  make; sudo make install" && exit 3
+	msg="Install first by:\n  make; sudo make install\nin the directory." &&
+	whiptail --infobox "$msg" 10 45 && exit 3
 read top bottom left right < <(overscan)
 
 # How big is the screen?
