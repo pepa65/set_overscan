@@ -83,7 +83,7 @@ t=$(stty size) ty=${t% *} tx=${t#* }
 
 # Create framebuffer-sized random and zeroed files
 mode=$(fbset |grep -o '[0-9]*x[0-9]*') random=$(mktemp) zeroes=$(mktemp)
-((bytes=${mode//x/*})
+((bytes=${mode//x/*}))
 dd if=/dev/urandom of="$random" bs=$bytes count=1
 dd if=/dev/zero of="$zeroes" bs=$bytes count=1
 
