@@ -8,20 +8,18 @@
 ## overscan
 **Get/set Raspberry Pi overscan values directly**
 
-Usage: `overscan [<top> <bottom> <left> <right>]`
-
++ Required: build-essential sudo[installing]
+* Usage: `overscan [<top> <bottom> <left> <right>]`
 If an argument is an unsigned integer, the overscan of the corresponding
 edge gets set. If not, the overscan for that edge will not be changed.
 Without arguments, current overscan values are displayed.
-
 This example modifies top and right, and leaves bottom and left unchanged:
-
-`overscan 16 - - 24`
+ - `overscan 16 - - 24`
 
 ## setoverscan
 **Adjust Raspberry Pi overscan interactively**
 
-* Usage: `bash setoverscan`
+* Usage: `sudo setoverscan`
 * Required: coreutils(od dd head cat stty) grep sed ncurses-bin(tput clear)
 libraspberrypi-bin(vcgencmd) fbset whiptail overscan
 

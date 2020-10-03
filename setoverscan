@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-# setoverscan v0.12a - Modify overscan on the fly
+# setoverscan v0.12a - Adjust Raspberry Pi overscan interactively
 # By Russell "ukscone" Davis
-#  using code from Broadcom, Dom Cobley & Alex Bradbury
-#  2013-03-10, 2014-07-23, 2015-05-01, 2017-08-01, 2020-09-27 (pepa65)
+#   using code from Broadcom, Dom Cobley & Alex Bradbury
+#   2013-03-10, 2014-07-23, 2015-05-01, 2017-08-01
+# 2020 gitlab.com/pepa65/setoverscan
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
