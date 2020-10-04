@@ -29,24 +29,21 @@
     Without arguments, current overscan values are displayed.\n"
 
 // Send property message to mailbox using ioctl
-static int mailbox_property(void *buf) {
-	int file_desc = open("/dev/vcio", 0);
-	if (file_desc == -1) {
+static void mailbox(void *buf) {
+	int fd = open("/dev/vcio", 0);
+	if (fd == -1) {
 		printf("Abort: device /dev/vcio not present\n");
 		exit(1);
 	}
-	int return_value = ioctl(file_desc, _IOWR(100, 0, char *), buf);
-	// Ioctl error of some kind
-	if (return_value < 0){
-		close(file_desc);
+	if (ioctl(fd, _IOWR(100, 0, char *), buf) < 0) {
+		close(fd);
 		printf("Abort: device /dev/vcio not accessible\n");
 		exit(2);
 	}
-	return return_value;
 }
 
 // Get the current values for overscan
-static unsigned get_overscan(unsigned coord[4]) {
+static void get_overscan(unsigned coord[4]) {
 	int i=0;
 	unsigned property[32];
 	property[i++] = 0;
@@ -60,17 +57,15 @@ static unsigned get_overscan(unsigned coord[4]) {
 	property[i++] = 0;
 	property[i++] = END_TAG;
 	property[0] = i * sizeof *property;
-	mailbox_property(property);
+	mailbox(property);
 	coord[0] = property[5]; // Top
 	coord[1] = property[6]; // Bottom
 	coord[2] = property[7]; // Left
 	coord[3] = property[8]; // Right
-	return 0;
 }
 
-// Set overscan values. No check is done that the values are sane or the
-// operation is successful. (Check values by running the program again.)
-static unsigned set_overscan(unsigned coord[4]) {
+// Set overscan values. No checks for sane values or successful operation.
+static void set_overscan(unsigned coord[4]) {
 	int i=0;
 	unsigned property[32];
 	property[i++] = 0;
@@ -84,12 +79,11 @@ static unsigned set_overscan(unsigned coord[4]) {
 	property[i++] = coord[3]; // Right
 	property[i++] = END_TAG;
 	property[0] = i * sizeof *property;
-	mailbox_property(property);
+	mailbox(property);
 	coord[0] = property[5]; // Top
 	coord[1] = property[6]; // Bottom
 	coord[2] = property[7]; // Left
 	coord[3] = property[8]; // Right
-	return 0;
 }
 
 // Start program
@@ -104,9 +98,14 @@ int main(int argc, char *argv[]) {
 			coord[i] = c;
 		}
 		set_overscan(coord);
-	} else if (argc == 1) {
+	}
+	if (argc == 1 || argc == 5) {
 		get_overscan(coord);
-		printf("%d %d %d %d\n", coord[0], coord[1], coord[2], coord[3]);
-	} else printf(USAGE);
+		printf("Overscan top, bottom, left, right: %d %d %d %d\n",
+			coord[0], coord[1], coord[2], coord[3]);
+	} else {
+		printf(USAGE);
+		return 3;
+	}
 	return 0;
 }
