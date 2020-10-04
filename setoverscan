@@ -41,12 +41,25 @@
 
 # Modify $conf with key=value
 Mod_conf(){ # $1:key $2:value
-	# Find the boot configuration directory
-
-	# Comment-out all existing active lines
-	sed -i "s@^ *($1=.*)@#\1@" "$conf"
-	# Replace the first old one with new key=value
-	sed -i "0,/^#$1=.*/s//$1=$2" "$conf"
+	local dirs dir conf done=0
+	# Find the boot configuration directory (vfat mounted on /boot/...)
+	dirs=$(grep ' vfat ' /proc/mounts |grep -o ' /boot[^ ]*')
+	for dir in $dirs
+	do
+		# Skip if this directory does not contain config.txt
+		[[ -f $dir/config.txt ]] || break
+		for conf in "$dir"/*.txt
+		do
+			# Comment-out all existing active lines
+			sed -i "s@^ *($1=.*)@#\1@" "$conf"
+			# Replace the first old one with new key=value
+			sed -i "0,/^#$1=.*/s//$1=$2" "$conf"
+			grep "^$1=$2" "$conf" && done=1
+			((done)) && break
+		done
+		# Add to config.txt if not yet added anywhere
+		((done)) || echo "$1=$2" >>"$dir/config.txt"
+	done
 }
 
 # Enable overscan and reboot if not enabled yet
