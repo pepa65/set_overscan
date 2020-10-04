@@ -52,7 +52,7 @@ Mod_conf(){ # $1:key $2:value  I:conf
 # Enable overscan and reboot if not enabled yet
 vcgencmd get_config disable_overscan |grep '1$' &&
 	Mod_conf disable_overscan 0 &&
-	msg="Manual overscan enabled in $conf, please reboot first to continue." &&
+	msg="Manual overscan enabled in $conf, reboot first to continue." &&
 	whiptail --infobox "$msg" 10 45 && exit 2
 
 Kc(){
@@ -80,7 +80,8 @@ created_mailbox=0
 ! overscan=$(type -p overscan) &&
 	msg="Install first by:\n  make; sudo make install\nin the directory." &&
 	whiptail --infobox "$msg" 10 45 && exit 3
-read top bottom left right < <(overscan)
+values=$(overscan |grep -o '[-0-9]* [-0-9]* [-0-9]* [-0-9]*$')
+read top bottom left right <<<"$values"
 
 # How big is the screen?
 t=$(stty size) ty=${t% *} tx=${t#* }

@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 	}
 	if (argc == 1 || argc == 5) {
 		get_overscan(coord);
-		printf("Overscan top, bottom, left, right: %d %d %d %d\n",
+		printf("Overscan top/bottom/left/right: %d %d %d %d\n",
 			coord[0], coord[1], coord[2], coord[3]);
 	} else {
 		printf(USAGE);
