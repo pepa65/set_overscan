@@ -34,15 +34,15 @@
 # Required: coreutils(od dd head cat stty) grep sed ncurses-bin(tput clear)
 #           libraspberrypi-bin(vcgencmd) fbset whiptail overscan
 
-conf=/boot/config.txt
-
 # Root/sudo required
 ((EUID)) &&
 	msg="Elevated privileges needed, run as root or with 'sudo $0'." &&
 	whiptail --msgbox "$msg" 10 45 && exit 1
 
 # Modify $conf with key=value
-Mod_conf(){ # $1:key $2:value  I:conf
+Mod_conf(){ # $1:key $2:value
+	# Find the boot configuration directory
+
 	# Comment-out all existing active lines
 	sed -i "s@^ *($1=.*)@#\1@" "$conf"
 	# Replace the first old one with new key=value
@@ -50,9 +50,9 @@ Mod_conf(){ # $1:key $2:value  I:conf
 }
 
 # Enable overscan and reboot if not enabled yet
-vcgencmd get_config disable_overscan |grep '1$' &&
-	Mod_conf disable_overscan 0 &&
-	msg="Manual overscan enabled in $conf, reboot first to continue." &&
+vcgencmd get_config disable_overscan |grep '0$' &&
+	Mod_conf disable_overscan 1 &&
+	msg="Default overscan disabled in on boot: reboot first to continue." &&
 	whiptail --infobox "$msg" 10 45 && exit 2
 
 Kc(){
@@ -130,8 +130,7 @@ Overscan(){ # $1:'top-left'/'bottom-right'  I:xmid,ymid,top,bottom,left,right
 Overscan top-left
 Overscan bottom-right
 
-# Finished so update $conf
-Mod_conf disable_overscan 1
+# Finished so update boot configuration
 Mod_conf overscan_top $top
 Mod_conf overscan_bottom $bottom
 Mod_conf overscan_left $left

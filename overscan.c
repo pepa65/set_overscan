@@ -20,13 +20,20 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
+#define TOP 0
+#define BOTTOM 1
+#define LEFT 2
+#define RIGHT 3
+#define OFFSET 5
+#define PROPERTYSIZE 32
 #define	OVERSCAN 0x0004000a
 #define ZZZS 0x00000010
-#define END_TAG 0
+#define ZERO 0
+#define ENDTAG ZERO
 #define USAGE "Usage: overscan [<top> <bottom> <left> <right>]\n\
-    If an argument is an unsigned integer, the overscan of the corresponding\n\
-    edge gets set. If not, the overscan for that edge will not be changed.\n\
-    Without arguments, current overscan values are displayed.\n"
+    If an argument is an integer, the overscan of the corresponding edge\n\
+    gets set. If not, the overscan for that edge will not be changed.\n\
+    The eventual overscan values are always displayed.\n"
 
 // Send property message to mailbox using ioctl
 static void mailbox(void *buf) {
@@ -43,69 +50,66 @@ static void mailbox(void *buf) {
 }
 
 // Get the current values for overscan
-static void get_overscan(unsigned coord[4]) {
-	int i=0;
-	unsigned property[32];
-	property[i++] = 0;
-	property[i++] = 0;
-	property[i++] = OVERSCAN;
-	property[i++] = ZZZS;
-	property[i++] = 0;
-	property[i++] = 0;
-	property[i++] = 0;
-	property[i++] = 0;
-	property[i++] = 0;
-	property[i++] = END_TAG;
-	property[0] = i * sizeof *property;
+static void get_overscan(__int32_t coord[4]) {
+	__int32_t property[PROPERTYSIZE];
+	property[0] = 10*PROPERTYSIZE;
+	property[1] = ZERO;
+	property[2] = OVERSCAN;
+	property[3] = ZZZS;
+	property[4] = ZERO;
+	property[5] = ZERO; // OFFSET + TOP
+	property[6] = ZERO; // OFFSET + BOTTOM
+	property[7] = ZERO; // OFFSET + LEFT
+	property[8] = ZERO; // OFFSET + RIGHT
+	property[9] = ENDTAG;
 	mailbox(property);
-	coord[0] = property[5]; // Top
-	coord[1] = property[6]; // Bottom
-	coord[2] = property[7]; // Left
-	coord[3] = property[8]; // Right
+	coord[TOP] = property[TOP+OFFSET];
+	coord[BOTTOM] = property[BOTTOM+OFFSET];
+	coord[LEFT] = property[LEFT+OFFSET];
+	coord[RIGHT] = property[RIGHT+OFFSET];
 }
 
 // Set overscan values. No checks for sane values or successful operation.
-static void set_overscan(unsigned coord[4]) {
-	int i=0;
-	unsigned property[32];
-	property[i++] = 0;
-	property[i++] = 0;
-	property[i++] = OVERSCAN;
-	property[i++] = ZZZS;
-	property[i++] = ZZZS;
-	property[i++] = coord[0]; // Top
-	property[i++] = coord[1]; // Bottom
-	property[i++] = coord[2]; // Left
-	property[i++] = coord[3]; // Right
-	property[i++] = END_TAG;
-	property[0] = i * sizeof *property;
+static void set_overscan(__int32_t coord[4]) {
+	__int32_t property[32];
+	property[0] = 10*PROPERTYSIZE;
+	property[1] = ZERO;
+	property[2] = OVERSCAN;
+	property[3] = ZZZS;
+	property[4] = ZZZS;
+	property[5] = coord[TOP];
+	property[6] = coord[BOTTOM];
+	property[7] = coord[LEFT];
+	property[8] = coord[RIGHT];
+	property[9] = ENDTAG;
 	mailbox(property);
-	coord[0] = property[5]; // Top
-	coord[1] = property[6]; // Bottom
-	coord[2] = property[7]; // Left
-	coord[3] = property[8]; // Right
+	coord[TOP] = property[TOP+OFFSET];
+	coord[BOTTOM] = property[BOTTOM+OFFSET];
+	coord[LEFT] = property[LEFT+OFFSET];
+	coord[RIGHT] = property[RIGHT+OFFSET];
 }
 
 // Start program
 int main(int argc, char *argv[]) {
-	unsigned coord[4];
-	if (argc == 5) {
-		get_overscan(coord);
-		unsigned c;
-		for (int i=0; i<4; i++) {
-			c = strtoul(argv[1+i], 0, 0);
-			if (c == 0 && *argv[1+i] != '0') continue;
-			coord[i] = c;
-		}
-		set_overscan(coord);
-	}
-	if (argc == 1 || argc == 5) {
-		get_overscan(coord);
-		printf("Overscan top/bottom/left/right: %d %d %d %d\n",
-			coord[0], coord[1], coord[2], coord[3]);
-	} else {
+	if (argc != 5 && argc != 1) {
 		printf(USAGE);
 		return 3;
 	}
+	__int32_t coord[4];
+	get_overscan(coord);
+	if (argc == 5) {
+		__int32_t c;
+		char *endptr;
+		for (int i=0; i<4; i++) {
+			c = strtol(argv[i+1], &endptr, 0);
+			// Only set if fully parsable
+			if (*endptr == '\0' && endptr != argv[i+1]) coord[i] = c;
+		}
+		set_overscan(coord);
+		// Get feedback on the operation
+		get_overscan(coord);
+	}
+	printf("Overscan top/bottom/left/right: %d %d %d %d\n",
+		coord[0], coord[1], coord[2], coord[3]);
 	return 0;
 }
